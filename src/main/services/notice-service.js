@@ -22,14 +22,10 @@ class NoticeService {
         };
     }
 
-    static async getNoticeById(id, isViewed) {
+    static async getNoticeById(id) {
         const notice = await db('notices').where({ id }).first();
         if (notice == null) {
             throw new Exception('ValueNotFoundException', 'Notice is not found');
-        }
-
-        if (isViewed == false) {
-            await db('notices').where({ id }).increment('count', 1);
         }
 
         const noticeFiles = await db('notice_files').where({ notice_id: id });
