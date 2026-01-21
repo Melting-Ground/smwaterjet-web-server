@@ -8,7 +8,6 @@ exports.up = function(knex) {
         table.string('author').notNullable(); 
         table.string('password').notNullable();
         table.string('phone_number').notNullable(); 
-        table.string('email').notNullable();
         table.string('title').notNullable();  
         table.text('content').notNullable(); 
         table.timestamp('created_at').defaultTo(knex.fn.now());
