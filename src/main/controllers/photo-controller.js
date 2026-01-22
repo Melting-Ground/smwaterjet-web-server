@@ -1,4 +1,5 @@
 const PhotoDto = require("@dtos/photo-dto/photo-dto");
+const PhotoFileDto = require("@dtos/photo-dto/photo-file-dto");
 const PhotoService = require("@services/photo-service");
 const Pagination = require('@utils/pagination');
 
@@ -23,12 +24,13 @@ class PhotoController {
         }
     }
 
-    static async getPhotosByYear(req, res, next) {
+    static async createPhoto(req, res, next) {
         try {
-            const pagination = new Pagination(req.query.page, req.query.limit);
-            const { year } = req.params;
-            const photoResDtos = await PhotoService.getPhotosByYear(year, pagination);
-            res.status(200).json(photoResDtos);
+            const photoDto = new PhotoDto(req.body);
+            const photoFileDto = new PhotoFileDto(req.files);
+            const photoResDto = await PhotoService.createPhoto(photoDto, photoFileDto);
+
+            res.status(201).json(photoResDto);
         } catch (error) {
             next(error);
         }
@@ -38,25 +40,12 @@ class PhotoController {
         try {
             const { photoId } = req.params;
             const photoDto = new PhotoDto(req.body);
-
-            const photoResDto = await PhotoService.editPhoto(photoId,photoDto);
+            const photoFileDto = new PhotoFileDto(req.files);
+    
+            const photoResDto = await PhotoService.editPhoto(photoId, photoDto, photoFileDto);
+    
             res.status(200).json(photoResDto);
-        } catch (error) {
-            next(error);
-        }
-    }
-
-    static async createPhoto(req, res, next) {
-        try {
-            const filePath = req.file.path;
-            const photoDto = new PhotoDto({
-                ...req.body,
-                path: filePath
-            });
-
-            const photoResDto = await PhotoService.createPhoto(photoDto);
-            res.status(201).json(photoResDto);
-        } catch (error) {
+        } catch(error) {
             next(error);
         }
     }
@@ -69,6 +58,17 @@ class PhotoController {
             res.status(200).json({ message: 'Photo deleted successfully' });
         } catch (error) {
             next(error);
+        }
+    }
+    
+    static async deleteFile(req, res, next) {
+        try {
+                const { photoFileId } = req.params;
+                await PhotoService.deleteFile(photoFileId);
+    
+                res.status(200).json({ message: 'PhotoFile deleted successfully' });
+        } catch (error) {
+                next(error);
         }
     }
 }

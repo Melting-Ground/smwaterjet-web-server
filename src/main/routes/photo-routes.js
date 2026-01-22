@@ -8,13 +8,14 @@ const upload = creatMulter('photos');
 const router = express.Router();
 
 router.get('/', PhotoController.getAllPhotos);
-router.get('/year/:year', PhotoController.getPhotosByYear);
 router.get('/:photoId', PhotoController.getPhotoById);
 
-router.put('/:photoId', authenticate, PhotoController.editPhoto);
+router.post('/', authenticate, upload.array('files', 5), PhotoController.createPhoto);
 
-router.post('/', authenticate, upload.single('file'), PhotoController.createPhoto);
+router.put('/:photoId', authenticate, upload.array('newFiles', 5), PhotoController.editPhoto);
 
+router.delete('/file/:photoFileId', authenticate, PhotoController.deleteFile);
 router.delete('/:photoId', authenticate, PhotoController.deletePhoto);
+
 
 module.exports = router;

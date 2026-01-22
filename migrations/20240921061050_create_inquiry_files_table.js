@@ -7,7 +7,7 @@ exports.up = function(knex) {
         table.increments('id').primary(); 
         table.integer('inquiry_id').unsigned().notNullable();
         table.string('file_path').notNullable(); 
-        table.foreign('inquiry_id').references('id').inTable('inquiries'); 
+        table.foreign('inquiry_id').references('id').inTable('inquiries').onDelete('CASCADE'); 
     });
 };
 
