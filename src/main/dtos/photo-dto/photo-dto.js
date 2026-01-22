@@ -1,8 +1,6 @@
 class PhotoDto {
-  constructor({ title, year, path }) {
+  constructor({ title }) {
     this.title = title;
-    this.year = year;
-    this.path = path;
   }
 }
 

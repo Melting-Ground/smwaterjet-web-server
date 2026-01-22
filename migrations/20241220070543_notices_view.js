@@ -11,7 +11,6 @@ exports.up = function(knex) {
 			author,
 			title,
 			content,
-			count,
 			created_at
         FROM 
             notices

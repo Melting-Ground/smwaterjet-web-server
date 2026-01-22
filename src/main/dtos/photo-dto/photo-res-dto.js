@@ -1,10 +1,9 @@
 class PhotoResponseDto {
-    constructor({ id, title, year, path, uploaded_at }) {
+    constructor({ id, title, created_at }, files = []) {
         this.id = id;
         this.title = title;
-        this.year = year;
-        this.path = path;
-        this.uploaded_at = uploaded_at;
+        this.files = Array.isArray(files) ? files : [];
+        this.created_at = created_at;
     }
 }
 
