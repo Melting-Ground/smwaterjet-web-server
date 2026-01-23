@@ -13,7 +13,7 @@ const turnstileRoutes = require('@routes/turnstile-routes');
 
 app.use(cors());
 
-app.set('port', process.env.PORT || 3000);
+app.set('port', process.env.PORT || 8000);
 
 app.use(express.json());
 
