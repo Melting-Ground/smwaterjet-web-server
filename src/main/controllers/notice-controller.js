@@ -3,7 +3,6 @@ const NoticeFileDto = require("@dtos/notice-dto/notice-file-dto");
 const NoticeService = require('@services/notice-service');
 const Pagination = require('@utils/pagination');
 const SearchParameters = require('@utils/search-parameters');
-const isCookieExists = require('@utils/cookie-util');
 
 class NoticeController {
     static async getAllNotices(req, res, next) {
@@ -18,9 +17,8 @@ class NoticeController {
     static async getNoticeById(req, res, next) {
         try {
             const { noticeId } = req.params;
-            const isViewed = isCookieExists(req, res, noticeId)
 
-            const noticeResDto = await NoticeService.getNoticeById(noticeId, isViewed);
+            const noticeResDto = await NoticeService.getNoticeById(noticeId);
             res.status(200).json(noticeResDto);
         } catch (error) {
             next(error);

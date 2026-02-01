@@ -6,9 +6,8 @@ exports.up = function(knex) {
     return knex.schema.createTable('photos', function(table) {
         table.increments('id').primary(); 
         table.string('title').notNullable(); 
-        table.integer('year').notNullable(); 
-        table.string('path').notNullable(); 
-        table.timestamp('uploaded_at').defaultTo(knex.fn.now());
+        table.string('thumbnail_path').notNullable(); 
+        table.timestamp('created_at').defaultTo(knex.fn.now());
     });
 };
 

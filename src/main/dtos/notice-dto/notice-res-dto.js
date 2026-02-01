@@ -1,12 +1,17 @@
 class NoticeResponseDto {
-    constructor({ id, author, title, content, count, created_at }, files = []) {
-        this.id = id;
-        this.author = author;
-        this.title = title;
-        this.content = content;
-        this.files = Array.isArray(files) ? files : [];
-        this.count = count;
-        this.created_at = created_at;
+    constructor(notice, files = []) {
+        this.id = notice.id;
+        this.author = notice.author;
+        this.title = notice.title;
+        this.content = notice.content;
+        this.created_at = notice.created_at;
+
+        this.files = Array.isArray(files)
+            ? files.map(file => ({
+                id: file.id,
+                file_path: file.file_path,
+            }))
+            : [];
     }
 }
 

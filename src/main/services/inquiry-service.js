@@ -8,122 +8,138 @@ const argon2 = require('argon2');
 const createSearchQuery = require('@utils/search-query-builder');
 
 class InquiryService {
+
+    /* 전체 조회 */
     static async getAllInquiries(pagination) {
         const offset = pagination.getOffset();
         const limit = pagination.limit;
 
-        const totalItemsResult = await db('inquiries_view').count('id as count').first();
-        const totalCount = totalItemsResult.count;
+        const totalResult = await db('inquiries').count('id as count').first();
+        const totalCount = totalResult.count;
 
-        const inquiries = await db('inquiries_view').limit(limit).offset(offset);
-        const inquiryListResDtos = inquiries.map(inquiry => new InquiryListResDto(inquiry));
+        const inquiries = await db('inquiries')
+            .orderBy('id', 'desc')
+            .limit(limit)
+            .offset(offset);
+
+        const items = inquiries.map(inquiry => new InquiryListResDto(inquiry));
+
         return {
-            items: inquiryListResDtos,
+            items,
             pagination: pagination.getPaginationInfo(totalCount),
         };
     }
 
+    /* 단건 조회 */
     static async getInquiryById(id) {
         const inquiry = await db('inquiries').where({ id }).first();
-        if (inquiry == null) {
+        if (!inquiry) {
             throw new Exception('ValueNotFoundException', 'Inquiry is not found');
         }
 
         const inquiryFiles = await db('inquiry_files').where({ inquiry_id: id });
+
         return new InquiryResDto(inquiry, inquiryFiles);
     }
 
+    /* 검색 */
     static async searchInquiries(pagination, searchParams) {
         const offset = pagination.getOffset();
         const limit = pagination.limit;
 
-        const inquiriesQuery = createSearchQuery('inquiries_view', searchParams);
+        const query = createSearchQuery('inquiries', searchParams);
 
-        const totalItemsResult = await inquiriesQuery.clone().count('id as count').first();
-        const totalCount = totalItemsResult.count;
+        const totalResult = await query.clone().count('id as count').first();
+        const totalCount = totalResult.count;
 
-        const inquiries = await inquiriesQuery.limit(limit).offset(offset);
-        const inquiryPublicResDtos = inquiries.map(inquiry => new InquiryListResDto(inquiry));
+        const inquiries = await query
+            .orderBy('id', 'desc')
+            .limit(limit)
+            .offset(offset);
+
+        const items = inquiries.map(inquiry => new InquiryListResDto(inquiry));
 
         return {
-            items: inquiryPublicResDtos,
+            items,
             pagination: pagination.getPaginationInfo(totalCount),
         };
     }
 
+    /* 등록 */
     static async createInquiry(inquiryDto, inquiryFileDto) {
         const hashedPassword = await argon2.hash(inquiryDto.password);
-        const filePaths = inquiryFileDto.paths.map(file => file.path);
+
         const newInquiry = new Inquiry({
             ...inquiryDto,
-            password: hashedPassword
+            password: hashedPassword,
         });
 
         const [insertedId] = await db('inquiries').insert(newInquiry);
 
         if (inquiryFileDto.isNotEmpty()) {
-            const fileInsertPromises = filePaths.map(async (path) => {
-                return await db('inquiry_files').insert({
-                    inquiry_id: insertedId,
-                    file_path: path,
-                });
-            });
-            await Promise.all(fileInsertPromises);
+            const files = inquiryFileDto.paths.map(file => ({
+                inquiry_id: insertedId,
+                file_path: file.path,
+            }));
+            await db('inquiry_files').insert(files);
         }
-        return new InquiryResDto({ id: insertedId, ...newInquiry }, filePaths);
+
+        const inquiryFiles = await db('inquiry_files').where({ inquiry_id: insertedId });
+
+        return new InquiryResDto({ id: insertedId, ...newInquiry }, inquiryFiles);
     }
 
+    /* 수정 */
     static async editInquiry(id, inquiryDto, inquiryFileDto) {
         const inquiry = await db('inquiries').where({ id }).first();
-        if (inquiry == null) {
+        if (!inquiry) {
             throw new Exception('ValueNotFoundException', 'Inquiry is not found');
         }
-
-        const filePaths = inquiryFileDto.paths.map(file => file.path);
 
         const updateInquiry = new Inquiry(inquiryDto);
         await db('inquiries').where({ id }).update(updateInquiry);
 
         if (inquiryFileDto.isNotEmpty()) {
-            const fileInsertPromises = filePaths.map(async (path) => {
-                return await db('inquiry_files').insert({
-                    inquiry_id: id,
-                    file_path: path,
-                });
-            });
-            await Promise.all(fileInsertPromises);
+            const files = inquiryFileDto.paths.map(file => ({
+                inquiry_id: id,
+                file_path: file.path,
+            }));
+            await db('inquiry_files').insert(files);
         }
-        return new InquiryResDto(updateInquiry, filePaths);
+
+        const inquiryFiles = await db('inquiry_files').where({ inquiry_id: id });
+
+        return new InquiryResDto({ id, ...updateInquiry }, inquiryFiles);
     }
 
+    /* 삭제 */
     static async deleteInquiry(id) {
         const inquiry = await db('inquiries').where({ id }).first();
-        if (inquiry == null) {
+        if (!inquiry) {
             throw new Exception('ValueNotFoundException', 'Inquiry is not found');
         }
-        const filePaths = await db('inquiry_files').where({ inquiry_id: id }).select('file_path');
 
-        for (const file of filePaths) {
-            try {
-                await fileDeleteUtil.deleteFile(file.path);
-            } catch (error) {
-                console.error(`Failed to delete file at ${file.path}:`, error);
-            }
+        const files = await db('inquiry_files')
+            .where({ inquiry_id: id })
+            .select('file_path');
+
+        for (const file of files) {
+            await fileDeleteUtil.deleteFile(file.file_path);
         }
+
         await db('inquiry_files').where({ inquiry_id: id }).del();
         await db('inquiries').where({ id }).del();
     }
 
+    /* 첨부파일 단건 삭제 */
     static async deleteFile(id) {
-        const file = await db('inquiry_files').where({ id }).select('file_path').first();
-        if (file == null) {
+        const file = await db('inquiry_files').where({ id }).first();
+        if (!file) {
             throw new Exception('ValueNotFoundException', 'InquiryFile is not found');
         }
-        const filePath = file.file_path;
 
+        await fileDeleteUtil.deleteFile(file.file_path);
         await db('inquiry_files').where({ id }).del();
-
-        await fileDeleteUtil.deleteFile(filePath);
     }
 }
 
