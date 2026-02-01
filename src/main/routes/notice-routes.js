@@ -13,7 +13,7 @@ router.get('/:noticeId', NoticeController.getNoticeById);
 
 router.post('/', authenticate, upload.array('files', 5), NoticeController.createNotice);
 
-router.put('/:noticeId', authenticate, upload.array('newFiles', 5), NoticeController.editNotice);
+router.put('/:noticeId', authenticate, upload.array('files', 5), NoticeController.editNotice);
 
 router.delete('/file/:noticeFileId', authenticate, NoticeController.deleteFile);
 router.delete('/:noticeId', authenticate, NoticeController.deleteNotice);

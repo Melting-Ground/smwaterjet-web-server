@@ -20,7 +20,10 @@ const createMulter = (category) => {
       cb(null, `${uniqueSuffix}-${file.originalname}`);
     }
   });
-  return multer({ storage: storage });
+  const limits = {
+    fileSize: 200 * 1024 * 1024, // 200MB
+  };
+  return multer({ storage: storage, limits });
 };
 
 module.exports = createMulter;
