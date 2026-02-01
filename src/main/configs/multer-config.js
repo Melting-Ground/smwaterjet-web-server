@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
+const Exception = require('@exceptions/exception');
 
 const createMulter = (category) => {
   const storage = multer.diskStorage({
@@ -23,7 +24,52 @@ const createMulter = (category) => {
   const limits = {
     fileSize: 200 * 1024 * 1024, // 200MB
   };
-  return multer({ storage: storage, limits });
+
+  const baseMimeTypes = [
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+    'video/mp4',
+    'video/quicktime',
+    'video/webm',
+  ];
+  const baseExtensions = [
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.webp',
+    '.gif',
+    '.mp4',
+    '.mov',
+    '.webm',
+  ];
+
+  const docMimeTypes = [
+    'application/pdf',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  ];
+  const docExtensions = [
+    '.pdf',
+    '.ppt',
+    '.pptx',
+  ];
+
+  const allowDocs = category === 'inquiries' || category === 'notices';
+  const allowedMimeTypes = new Set(allowDocs ? [...baseMimeTypes, ...docMimeTypes] : baseMimeTypes);
+  const allowedExtensions = new Set(allowDocs ? [...baseExtensions, ...docExtensions] : baseExtensions);
+
+  const fileFilter = (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const isAllowed = allowedMimeTypes.has(file.mimetype) && allowedExtensions.has(ext);
+    if (!isAllowed) {
+      return cb(new Exception('BadRequestException', '허용되지 않은 파일 형식입니다.'));
+    }
+    cb(null, true);
+  };
+
+  return multer({ storage: storage, limits, fileFilter });
 };
 
 module.exports = createMulter;

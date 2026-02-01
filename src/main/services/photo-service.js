@@ -1,10 +1,9 @@
 const db = require('@configs/knex');
-const Photo = require("@models/photo/photo");
-const PhotoResDto = require("@dtos/photo-dto/photo-res-dto");
+const Photo = require('@models/photo/photo');
+const PhotoResDto = require('@dtos/photo-dto/photo-res-dto');
 const fileDeleteUtil = require('@utils/file-delete-util');
 const Exception = require('@exceptions/exception');
-const PhotoListResDto = require("@dtos/photo-dto/photo-list-res-dto");
-
+const PhotoListResDto = require('@dtos/photo-dto/photo-list-res-dto');
 
 class PhotoService {
   static async getAllPhotos(pagination) {
@@ -52,64 +51,86 @@ class PhotoService {
       throw new Exception('InternalServerException', 'thumbnail_path 생성 실패 (file_path 없음)');
     }
 
-    // 2) photos insert
-    const newPhoto = new Photo({
-      ...photoDto,
-      thumbnail_path: thumbnailPath,
-    });
+    try {
+      return await db.transaction(async (trx) => {
+        const newPhoto = new Photo({
+          ...photoDto,
+          thumbnail_path: thumbnailPath,
+        });
 
-    const [insertedId] = await db('photos').insert(newPhoto);
+        const [insertedId] = await trx('photos').insert(newPhoto);
 
-    // 3) photo_files insert
-    const photoFiles = photoFileDto.files.map(file => ({
-      photo_id: insertedId,
-      file_path: file.file_path,
-    }));
-    await db('photo_files').insert(photoFiles);
+        const photoFiles = photoFileDto.files.map(file => ({
+          photo_id: insertedId,
+          file_path: file.file_path,
+        }));
+        await trx('photo_files').insert(photoFiles);
 
-    return new PhotoResDto(
-      { id: insertedId, ...newPhoto },
-      photoFileDto.files
-    );
+        return new PhotoResDto(
+          { id: insertedId, ...newPhoto },
+          photoFileDto.files
+        );
+      });
+    } catch (error) {
+      if (photoFileDto?.files?.length) {
+        for (const file of photoFileDto.files) {
+          try {
+            await fileDeleteUtil.deleteFile(file.file_path);
+          } catch (e) { }
+        }
+      }
+      throw error;
+    }
   }
 
-
-
   static async editPhoto(id, photoDto, photoFileDto) {
-    const photo = await db('photos').where({ id }).first();
-    if (!photo) {
-      throw new Exception('ValueNotFoundException', 'Photo is not found');
-    }
+    try {
+      return await db.transaction(async (trx) => {
+        const photo = await trx('photos').where({ id }).first();
+        if (!photo) {
+          throw new Exception('ValueNotFoundException', 'Photo is not found');
+        }
 
-    let thumbnailPath = photo.thumbnail_path;
+        let thumbnailPath = photo.thumbnail_path;
 
-    if (photoFileDto?.files?.length) {
-      const nextThumb = photoFileDto.files[0]?.file_path;
-      if (!nextThumb) {
-        throw new Exception('InternalServerException', 'thumbnail_path 생성 실패 (file_path 없음)');
+        if (photoFileDto?.files?.length) {
+          const nextThumb = photoFileDto.files[0]?.file_path;
+          if (!nextThumb) {
+            throw new Exception('InternalServerException', 'thumbnail_path 생성 실패 (file_path 없음)');
+          }
+          thumbnailPath = nextThumb;
+
+          const photoFiles = photoFileDto.files.map(file => ({
+            photo_id: id,
+            file_path: file.file_path,
+          }));
+          await trx('photo_files').insert(photoFiles);
+        }
+
+        const updatePhoto = new Photo({
+          ...photoDto,
+          thumbnail_path: thumbnailPath,
+        });
+
+        await trx('photos').where({ id }).update(updatePhoto);
+
+        const photoFiles = await trx('photo_files').where({ photo_id: id });
+
+        return new PhotoResDto(
+          { id, ...updatePhoto },
+          photoFiles
+        );
+      });
+    } catch (error) {
+      if (photoFileDto?.files?.length) {
+        for (const file of photoFileDto.files) {
+          try {
+            await fileDeleteUtil.deleteFile(file.file_path);
+          } catch (e) { }
+        }
       }
-      thumbnailPath = nextThumb;
-
-      const photoFiles = photoFileDto.files.map(file => ({
-        photo_id: id,
-        file_path: file.file_path,
-      }));
-      await db('photo_files').insert(photoFiles);
+      throw error;
     }
-
-    const updatePhoto = new Photo({
-      ...photoDto,
-      thumbnail_path: thumbnailPath,
-    });
-
-    await db('photos').where({ id }).update(updatePhoto);
-
-    const photoFiles = await db('photo_files').where({ photo_id: id });
-
-    return new PhotoResDto(
-      { id, ...updatePhoto },
-      photoFiles
-    );
   }
 
   static async deletePhoto(id) {
@@ -118,17 +139,14 @@ class PhotoService {
       throw new Exception('ValueNotFoundException', 'Photo is not found');
     }
 
-    // 연관 파일 조회
     const photoFiles = await db('photo_files').where({ photo_id: id });
 
-    // 실제 파일 삭제
     for (const file of photoFiles) {
       try {
         await fileDeleteUtil.deleteFile(file.file_path);
       } catch (e) { }
     }
 
-    // photo_files → photos 순서로 삭제
     await db('photo_files').where({ photo_id: id }).del();
     await db('photos').where({ id }).del();
   }
@@ -139,13 +157,11 @@ class PhotoService {
       throw new Exception('ValueNotFoundException', 'PhotoFile is not found');
     }
 
-    // 1) 실제 파일 삭제 + photo_files row 삭제
     try {
       await fileDeleteUtil.deleteFile(file.file_path);
     } catch (e) { }
     await db('photo_files').where({ id: photoFileId }).del();
 
-    // 2) 해당 photo의 현재 썸네일이 방금 삭제한 파일이면 썸네일 재지정
     const photo = await db('photos').where({ id: file.photo_id }).first();
     if (!photo) return;
 

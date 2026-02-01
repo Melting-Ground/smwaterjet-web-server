@@ -7,8 +7,6 @@ const fileDeleteUtil = require('@utils/file-delete-util');
 const createSearchQuery = require('@utils/search-query-builder');
 
 class NoticeService {
-
-    /* 전체 조회 */
     static async getAllNotices(pagination) {
         const offset = pagination.getOffset();
         const limit = pagination.limit;
@@ -31,7 +29,6 @@ class NoticeService {
         };
     }
 
-    /* 단건 조회 */
     static async getNoticeById(id) {
         const notice = await db('notices').where({ id }).first();
         if (!notice) {
@@ -43,7 +40,6 @@ class NoticeService {
         return new NoticeResDto(notice, noticeFiles);
     }
 
-    /* 검색 */
     static async searchNotices(pagination, searchParams) {
         const offset = pagination.getOffset();
         const limit = pagination.limit;
@@ -68,48 +64,71 @@ class NoticeService {
         };
     }
 
-    /* 등록 */
     static async createNotice(noticeDto, noticeFileDto) {
-        const newNotice = new Notice(noticeDto);
-        const [insertedId] = await db('notices').insert(newNotice);
+        try {
+            return await db.transaction(async (trx) => {
+                const newNotice = new Notice(noticeDto);
+                const [insertedId] = await trx('notices').insert(newNotice);
 
-        if (noticeFileDto.isNotEmpty()) {
-            const files = noticeFileDto.paths.map(file => ({
-                notice_id: insertedId,
-                file_path: file.path,
-            }));
-            await db('notice_files').insert(files);
+                if (noticeFileDto.isNotEmpty()) {
+                    const files = noticeFileDto.paths.map(file => ({
+                        notice_id: insertedId,
+                        file_path: file.path,
+                    }));
+                    await trx('notice_files').insert(files);
+                }
+
+                const noticeFiles = await trx('notice_files').where({ notice_id: insertedId });
+
+                return new NoticeResDto({ id: insertedId, ...newNotice }, noticeFiles);
+            });
+        } catch (error) {
+            if (noticeFileDto?.isNotEmpty?.()) {
+                for (const file of noticeFileDto.paths) {
+                    try {
+                        await fileDeleteUtil.deleteFile(file.path);
+                    } catch (e) { }
+                }
+            }
+            throw error;
         }
-
-        const noticeFiles = await db('notice_files').where({ notice_id: insertedId });
-
-        return new NoticeResDto({ id: insertedId, ...newNotice }, noticeFiles);
     }
 
-    /* 수정 */
     static async editNotice(id, noticeDto, noticeFileDto) {
-        const notice = await db('notices').where({ id }).first();
-        if (!notice) {
-            throw new Exception('ValueNotFoundException', 'Notice is not found');
+        try {
+            return await db.transaction(async (trx) => {
+                const notice = await trx('notices').where({ id }).first();
+                if (!notice) {
+                    throw new Exception('ValueNotFoundException', 'Notice is not found');
+                }
+
+                const updateNotice = new Notice(noticeDto);
+                await trx('notices').where({ id }).update(updateNotice);
+
+                if (noticeFileDto.isNotEmpty()) {
+                    const files = noticeFileDto.paths.map(file => ({
+                        notice_id: id,
+                        file_path: file.path,
+                    }));
+                    await trx('notice_files').insert(files);
+                }
+
+                const noticeFiles = await trx('notice_files').where({ notice_id: id });
+
+                return new NoticeResDto({ id, ...updateNotice }, noticeFiles);
+            });
+        } catch (error) {
+            if (noticeFileDto?.isNotEmpty?.()) {
+                for (const file of noticeFileDto.paths) {
+                    try {
+                        await fileDeleteUtil.deleteFile(file.path);
+                    } catch (e) { }
+                }
+            }
+            throw error;
         }
-
-        const updateNotice = new Notice(noticeDto);
-        await db('notices').where({ id }).update(updateNotice);
-
-        if (noticeFileDto.isNotEmpty()) {
-            const files = noticeFileDto.paths.map(file => ({
-                notice_id: id,
-                file_path: file.path,
-            }));
-            await db('notice_files').insert(files);
-        }
-
-        const noticeFiles = await db('notice_files').where({ notice_id: id });
-
-        return new NoticeResDto({ id, ...updateNotice }, noticeFiles);
     }
 
-    /* 삭제 */
     static async deleteNotice(id) {
         const notice = await db('notices').where({ id }).first();
         if (!notice) {
@@ -121,21 +140,24 @@ class NoticeService {
             .select('file_path');
 
         for (const file of files) {
-            await fileDeleteUtil.deleteFile(file.file_path);
+            try {
+                await fileDeleteUtil.deleteFile(file.file_path);
+            } catch (e) { }
         }
 
         await db('notice_files').where({ notice_id: id }).del();
         await db('notices').where({ id }).del();
     }
 
-    /* 첨부파일 단건 삭제 */
     static async deleteFile(id) {
         const file = await db('notice_files').where({ id }).first();
         if (!file) {
             throw new Exception('ValueNotFoundException', 'NoticeFile is not found');
         }
 
-        await fileDeleteUtil.deleteFile(file.file_path);
+        try {
+            await fileDeleteUtil.deleteFile(file.file_path);
+        } catch (e) { }
         await db('notice_files').where({ id }).del();
     }
 }
