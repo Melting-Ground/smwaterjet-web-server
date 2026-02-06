@@ -43,12 +43,12 @@ class PhotoService {
 
   static async createPhoto(photoDto, photoFileDto) {
     if (!photoFileDto?.files || photoFileDto.files.length === 0) {
-      throw new Exception('BadRequestException', '사진 파일(files)이 필요합니다.');
+      throw new Exception('BadRequestException', 'Photo files are required.');
     }
 
     const thumbnailPath = photoFileDto.files[0]?.file_path;
     if (!thumbnailPath) {
-      throw new Exception('InternalServerException', 'thumbnail_path 생성 실패 (file_path 없음)');
+      throw new Exception('InternalServerException', 'Failed to set thumbnail_path (missing file_path).');
     }
 
     try {
@@ -96,7 +96,7 @@ class PhotoService {
         if (photoFileDto?.files?.length) {
           const nextThumb = photoFileDto.files[0]?.file_path;
           if (!nextThumb) {
-            throw new Exception('InternalServerException', 'thumbnail_path 생성 실패 (file_path 없음)');
+            throw new Exception('InternalServerException', 'Failed to set thumbnail_path (missing file_path).');
           }
           thumbnailPath = nextThumb;
 
@@ -172,7 +172,7 @@ class PhotoService {
         .first();
 
       if (!remain) {
-        throw new Exception('BadRequestException', '마지막 파일은 삭제할 수 없습니다(썸네일 NOT NULL).');
+        throw new Exception('BadRequestException', 'Cannot delete the last file because thumbnail_path is required.');
       }
 
       await db('photos')

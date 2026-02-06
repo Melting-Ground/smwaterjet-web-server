@@ -3,6 +3,10 @@ const Exception = require('../exceptions/exception');
 
 const secretKey = process.env.JWT_SECRETKEY;
 
+if (!secretKey) {
+  throw new Exception('ConfigurationException', 'JWT_SECRETKEY is not set in environment variables');
+}
+
 const generateToken = (admin) => {
   return jwt.sign({ id: admin.phoneNumber }, secretKey, { expiresIn: '3h' });
 };

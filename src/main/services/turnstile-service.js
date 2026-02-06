@@ -1,4 +1,3 @@
-const FormData = require("form-data");
 const Exception = require('@exceptions/exception');
 require('dotenv').config();
 
@@ -12,15 +11,16 @@ const handlePost = async (token) => {
 	const secretKey = process.env.CAPTCHA_SECRETKEY;
 
 	const url = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+	const body = new URLSearchParams({
+		secret: secretKey,
+		response: token,
+	});
 	const result = await fetch(url, {
-		body: JSON.stringify({
-			secret: secretKey,
-			response: token
-		}),
 		method: 'POST',
+		body,
 		headers: {
-			'Content-Type': 'application/json'
-		}
+			'Content-Type': 'application/x-www-form-urlencoded',
+		},
 	});
 
 	const outcome = await result.json();

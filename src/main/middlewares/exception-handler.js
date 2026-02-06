@@ -24,12 +24,28 @@ const exceptionHandler = (err, req, res, next) => {
 
     if (err.name === 'MulterError') {
         if (err.code === 'LIMIT_FILE_SIZE') {
-            return res.status(413).json({ message: '파일 크기는 최대 200MB입니다.' });
+            return res.status(413).json({ message: 'File size exceeds the 200MB limit.' });
         }
         if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-            return res.status(400).json({ message: '파일 필드명은 files 입니다.' });
+            return res.status(400).json({ message: 'Unexpected file field. Use "files".' });
         }
-        return res.status(400).json({ message: `파일 업로드 오류: ${err.message}` });
+        return res.status(400).json({ message: `File upload error: ${err.message}` });
+    }
+
+    if (err.name === 'ConfigurationException') {
+        return res.status(500).json({ message: err.message });
+    }
+
+    if (err.name === 'InternalServerException') {
+        return res.status(500).json({ message: err.message });
+    }
+
+    if (err.message === 'Not allowed by CORS') {
+        return res.status(403).json({ message: err.message });
+    }
+
+    if (err.message === 'CORS is not configured') {
+        return res.status(500).json({ message: err.message });
     }
 
     res.status(500).json({ message: 'Internal Server Error' });

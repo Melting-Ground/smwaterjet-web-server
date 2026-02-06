@@ -17,7 +17,7 @@ const createMulter = (category) => {
 
     filename: function (req, file, cb) {
       const uniqueSuffix = Date.now();
-      file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8')
+      file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
       cb(null, `${uniqueSuffix}-${file.originalname}`);
     }
   });
@@ -64,7 +64,7 @@ const createMulter = (category) => {
     const ext = path.extname(file.originalname || '').toLowerCase();
     const isAllowed = allowedMimeTypes.has(file.mimetype) && allowedExtensions.has(ext);
     if (!isAllowed) {
-      return cb(new Exception('BadRequestException', '허용되지 않은 파일 형식입니다.'));
+      return cb(new Exception('BadRequestException', 'Unsupported file type.'));
     }
     cb(null, true);
   };
