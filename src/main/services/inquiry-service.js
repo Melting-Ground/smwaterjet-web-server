@@ -6,6 +6,7 @@ const Exception = require('@exceptions/exception');
 const fileDeleteUtil = require('@utils/file-delete-util');
 const argon2 = require('argon2');
 const createSearchQuery = require('@utils/search-query-builder');
+const storage = require('@utils/storage');
 
 class InquiryService {
     static async getAllInquiries(pagination) {
@@ -62,7 +63,11 @@ class InquiryService {
     }
 
     static async createInquiry(inquiryDto, inquiryFileDto) {
+        let storedPaths = [];
         try {
+            if (inquiryFileDto.isNotEmpty()) {
+                storedPaths = await storage.storePaths(inquiryFileDto.paths);
+            }
             return await db.transaction(async (trx) => {
                 const hashedPassword = await argon2.hash(inquiryDto.password);
 
@@ -73,8 +78,8 @@ class InquiryService {
 
                 const [insertedId] = await trx('inquiries').insert(newInquiry);
 
-                if (inquiryFileDto.isNotEmpty()) {
-                    const files = inquiryFileDto.paths.map(file => ({
+                if (storedPaths.length > 0) {
+                    const files = storedPaths.map(file => ({
                         inquiry_id: insertedId,
                         file_path: file.path,
                     }));
@@ -86,19 +91,21 @@ class InquiryService {
                 return new InquiryResDto({ id: insertedId, ...newInquiry }, inquiryFiles);
             });
         } catch (error) {
-            if (inquiryFileDto?.isNotEmpty?.()) {
-                for (const file of inquiryFileDto.paths) {
-                    try {
-                        await fileDeleteUtil.deleteFile(file.path);
-                    } catch (e) { }
-                }
+            for (const file of storedPaths) {
+                try {
+                    await fileDeleteUtil.deleteFile(file.path);
+                } catch (e) { }
             }
             throw error;
         }
     }
 
     static async editInquiry(id, inquiryDto, inquiryFileDto) {
+        let storedPaths = [];
         try {
+            if (inquiryFileDto.isNotEmpty()) {
+                storedPaths = await storage.storePaths(inquiryFileDto.paths);
+            }
             return await db.transaction(async (trx) => {
                 const inquiry = await trx('inquiries').where({ id }).first();
                 if (!inquiry) {
@@ -108,8 +115,8 @@ class InquiryService {
                 const updateInquiry = new Inquiry(inquiryDto);
                 await trx('inquiries').where({ id }).update(updateInquiry);
 
-                if (inquiryFileDto.isNotEmpty()) {
-                    const files = inquiryFileDto.paths.map(file => ({
+                if (storedPaths.length > 0) {
+                    const files = storedPaths.map(file => ({
                         inquiry_id: id,
                         file_path: file.path,
                     }));
@@ -121,12 +128,10 @@ class InquiryService {
                 return new InquiryResDto({ id, ...updateInquiry }, inquiryFiles);
             });
         } catch (error) {
-            if (inquiryFileDto?.isNotEmpty?.()) {
-                for (const file of inquiryFileDto.paths) {
-                    try {
-                        await fileDeleteUtil.deleteFile(file.path);
-                    } catch (e) { }
-                }
+            for (const file of storedPaths) {
+                try {
+                    await fileDeleteUtil.deleteFile(file.path);
+                } catch (e) { }
             }
             throw error;
         }

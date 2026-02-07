@@ -5,6 +5,7 @@ const Notice = require('@models/notice/notice');
 const Exception = require('@exceptions/exception');
 const fileDeleteUtil = require('@utils/file-delete-util');
 const createSearchQuery = require('@utils/search-query-builder');
+const storage = require('@utils/storage');
 
 class NoticeService {
     static async getAllNotices(pagination) {
@@ -65,13 +66,17 @@ class NoticeService {
     }
 
     static async createNotice(noticeDto, noticeFileDto) {
+        let storedPaths = [];
         try {
+            if (noticeFileDto.isNotEmpty()) {
+                storedPaths = await storage.storePaths(noticeFileDto.paths);
+            }
             return await db.transaction(async (trx) => {
                 const newNotice = new Notice(noticeDto);
                 const [insertedId] = await trx('notices').insert(newNotice);
 
-                if (noticeFileDto.isNotEmpty()) {
-                    const files = noticeFileDto.paths.map(file => ({
+                if (storedPaths.length > 0) {
+                    const files = storedPaths.map(file => ({
                         notice_id: insertedId,
                         file_path: file.path,
                     }));
@@ -83,19 +88,21 @@ class NoticeService {
                 return new NoticeResDto({ id: insertedId, ...newNotice }, noticeFiles);
             });
         } catch (error) {
-            if (noticeFileDto?.isNotEmpty?.()) {
-                for (const file of noticeFileDto.paths) {
-                    try {
-                        await fileDeleteUtil.deleteFile(file.path);
-                    } catch (e) { }
-                }
+            for (const file of storedPaths) {
+                try {
+                    await fileDeleteUtil.deleteFile(file.path);
+                } catch (e) { }
             }
             throw error;
         }
     }
 
     static async editNotice(id, noticeDto, noticeFileDto) {
+        let storedPaths = [];
         try {
+            if (noticeFileDto.isNotEmpty()) {
+                storedPaths = await storage.storePaths(noticeFileDto.paths);
+            }
             return await db.transaction(async (trx) => {
                 const notice = await trx('notices').where({ id }).first();
                 if (!notice) {
@@ -105,8 +112,8 @@ class NoticeService {
                 const updateNotice = new Notice(noticeDto);
                 await trx('notices').where({ id }).update(updateNotice);
 
-                if (noticeFileDto.isNotEmpty()) {
-                    const files = noticeFileDto.paths.map(file => ({
+                if (storedPaths.length > 0) {
+                    const files = storedPaths.map(file => ({
                         notice_id: id,
                         file_path: file.path,
                     }));
@@ -118,12 +125,10 @@ class NoticeService {
                 return new NoticeResDto({ id, ...updateNotice }, noticeFiles);
             });
         } catch (error) {
-            if (noticeFileDto?.isNotEmpty?.()) {
-                for (const file of noticeFileDto.paths) {
-                    try {
-                        await fileDeleteUtil.deleteFile(file.path);
-                    } catch (e) { }
-                }
+            for (const file of storedPaths) {
+                try {
+                    await fileDeleteUtil.deleteFile(file.path);
+                } catch (e) { }
             }
             throw error;
         }

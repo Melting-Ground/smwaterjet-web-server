@@ -22,7 +22,7 @@ const createMulter = (category) => {
     }
   });
   const limits = {
-    fileSize: 200 * 1024 * 1024, // 200MB
+    fileSize: 50 * 1024 * 1024, // 50MB
   };
 
   const baseMimeTypes = [

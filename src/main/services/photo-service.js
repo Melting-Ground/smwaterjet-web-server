@@ -4,6 +4,7 @@ const PhotoResDto = require('@dtos/photo-dto/photo-res-dto');
 const fileDeleteUtil = require('@utils/file-delete-util');
 const Exception = require('@exceptions/exception');
 const PhotoListResDto = require('@dtos/photo-dto/photo-list-res-dto');
+const storage = require('@utils/storage');
 
 class PhotoService {
   static async getAllPhotos(pagination) {
@@ -46,7 +47,14 @@ class PhotoService {
       throw new Exception('BadRequestException', 'Photo files are required.');
     }
 
-    const thumbnailPath = photoFileDto.files[0]?.file_path;
+    let storedFiles = [];
+    try {
+      storedFiles = await storage.storePaths(photoFileDto.files);
+    } catch (error) {
+      throw error;
+    }
+
+    const thumbnailPath = storedFiles[0]?.path;
     if (!thumbnailPath) {
       throw new Exception('InternalServerException', 'Failed to set thumbnail_path (missing file_path).');
     }
@@ -60,31 +68,33 @@ class PhotoService {
 
         const [insertedId] = await trx('photos').insert(newPhoto);
 
-        const photoFiles = photoFileDto.files.map(file => ({
+        const photoFiles = storedFiles.map(file => ({
           photo_id: insertedId,
-          file_path: file.file_path,
+          file_path: file.path,
         }));
         await trx('photo_files').insert(photoFiles);
 
         return new PhotoResDto(
           { id: insertedId, ...newPhoto },
-          photoFileDto.files
+          photoFiles
         );
       });
     } catch (error) {
-      if (photoFileDto?.files?.length) {
-        for (const file of photoFileDto.files) {
-          try {
-            await fileDeleteUtil.deleteFile(file.file_path);
-          } catch (e) { }
-        }
+      for (const file of storedFiles) {
+        try {
+          await fileDeleteUtil.deleteFile(file.path);
+        } catch (e) { }
       }
       throw error;
     }
   }
 
   static async editPhoto(id, photoDto, photoFileDto) {
+    let storedFiles = [];
     try {
+      if (photoFileDto?.files?.length) {
+        storedFiles = await storage.storePaths(photoFileDto.files);
+      }
       return await db.transaction(async (trx) => {
         const photo = await trx('photos').where({ id }).first();
         if (!photo) {
@@ -93,16 +103,16 @@ class PhotoService {
 
         let thumbnailPath = photo.thumbnail_path;
 
-        if (photoFileDto?.files?.length) {
-          const nextThumb = photoFileDto.files[0]?.file_path;
+        if (storedFiles.length) {
+          const nextThumb = storedFiles[0]?.path;
           if (!nextThumb) {
             throw new Exception('InternalServerException', 'Failed to set thumbnail_path (missing file_path).');
           }
           thumbnailPath = nextThumb;
 
-          const photoFiles = photoFileDto.files.map(file => ({
+          const photoFiles = storedFiles.map(file => ({
             photo_id: id,
-            file_path: file.file_path,
+            file_path: file.path,
           }));
           await trx('photo_files').insert(photoFiles);
         }
@@ -122,12 +132,10 @@ class PhotoService {
         );
       });
     } catch (error) {
-      if (photoFileDto?.files?.length) {
-        for (const file of photoFileDto.files) {
-          try {
-            await fileDeleteUtil.deleteFile(file.file_path);
-          } catch (e) { }
-        }
+      for (const file of storedFiles) {
+        try {
+          await fileDeleteUtil.deleteFile(file.path);
+        } catch (e) { }
       }
       throw error;
     }

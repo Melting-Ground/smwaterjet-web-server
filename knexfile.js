@@ -4,17 +4,38 @@
  */
 
 require('dotenv').config();
+const fs = require('fs');
+
+const getSslConfig = () => {
+  const sslMode = (process.env.DB_SSL || '').toLowerCase();
+  if (!sslMode || sslMode === 'false' || sslMode === 'disable') return undefined;
+
+  const caPath = process.env.DB_SSL_CA_PATH;
+  if (caPath) {
+    try {
+      const ca = fs.readFileSync(caPath, 'utf8');
+      return { rejectUnauthorized: true, ca };
+    } catch (error) {
+      throw new Error(`Failed to read DB_SSL_CA_PATH: ${caPath}`);
+    }
+  }
+  return { rejectUnauthorized: true };
+};
+
+const baseConnection = {
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
+  ssl: getSslConfig(),
+};
 
 module.exports = {
   
   development: {
     client: 'mysql2',
-    connection: {
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME
-    },
+    connection: baseConnection,
     pool: {
       min: 2,
       max: 10
@@ -29,12 +50,7 @@ module.exports = {
   },
   test: {
     client: 'mysql2',
-    connection: {
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME
-    },
+    connection: baseConnection,
     pool: {
       min: 2,
       max: 10
@@ -49,12 +65,7 @@ module.exports = {
   },
   staging: {
     client: 'mysql2',
-    connection: {
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME
-    },
+    connection: baseConnection,
     pool: {
       min: 2,
       max: 10
@@ -70,12 +81,7 @@ module.exports = {
 
   production: {
     client: 'mysql2',
-    connection: {
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME
-    },
+    connection: baseConnection,
     pool: {
       min: 2,
       max: 10
