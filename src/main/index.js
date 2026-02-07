@@ -34,7 +34,7 @@ app.use(cors({
   credentials: true,
 }));
 
-app.set('port', process.env.PORT || 8000);
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
@@ -59,6 +59,6 @@ app.use('/notices', noticeRoutes);
 
 app.use(exceptionHandler);
 
-app.listen(app.get('port'), () => {
-  console.log('Express server listening on port ' + app.get('port'));
+app.listen(PORT, '0.0.0.0', () => {
+  console.log('Express server listening on port ' + PORT);
 });
