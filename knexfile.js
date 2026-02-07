@@ -11,15 +11,15 @@ const getSslConfig = () => {
   if (!sslMode || sslMode === 'false' || sslMode === 'disable') return undefined;
 
   const caPath = process.env.DB_SSL_CA_PATH;
-  if (caPath) {
-    try {
-      const ca = fs.readFileSync(caPath, 'utf8');
-      return { rejectUnauthorized: true, ca };
-    } catch (error) {
-      throw new Error(`Failed to read DB_SSL_CA_PATH: ${caPath}`);
-    }
+  if (!caPath) {
+    return { rejectUnauthorized: true };
   }
-  return { rejectUnauthorized: true };
+  if (!fs.existsSync(caPath)) {
+    console.warn(`DB_SSL_CA_PATH not found: ${caPath}. Using default TLS.`);
+    return { rejectUnauthorized: true };
+  }
+  const ca = fs.readFileSync(caPath, 'utf8');
+  return { rejectUnauthorized: true, ca };
 };
 
 const baseConnection = {
