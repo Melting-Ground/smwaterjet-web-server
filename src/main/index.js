@@ -16,7 +16,10 @@ const turnstileRoutes = require('@routes/turnstile-routes');
 
 app.set('trust proxy', 1);
 
-const corsOrigins = getCorsOrigins();
+const corsOrigins = (process.env.CORS_ORIGINS ?? "")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
 const isProd = process.env.NODE_ENV === 'production';
 
 app.use(cors({
